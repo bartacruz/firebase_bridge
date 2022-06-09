@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import asyncio
 import inspect
 import json
@@ -13,6 +14,8 @@ from xmppgcm import GCM, XMPPEvent
 logger = logging.getLogger(__name__)
 
 def cursored(func):
+    ''' Creates a new cursor and self, executes function and then commits and 
+        closes the cursor'''
     def inner(self,*args,**kwargs):
         new_cr = self.pool.cursor()
         self = self.with_env(self.env(cr=new_cr))
@@ -23,6 +26,7 @@ def cursored(func):
     return inner
         
 class FirebaseBridge(models.Model):
+    ''' Google FCM Bridge to Odoo API, using XMPP'''
     _name = 'firebase.bridge'
     _description = 'Firebase Bridge'
     
@@ -51,6 +55,7 @@ class FirebaseBridge(models.Model):
         thread.start()
     
     def get_thread(self):
+        ''' Gets the thread running the XMPP connection, based on the id'''
         thread_name = 'firebase-%s' % self.id
         for t in threading.enumerate():
             if t.name == thread_name:
@@ -96,11 +101,11 @@ class FirebaseBridge(models.Model):
                 message = firebase_queue.pop()
                 to = message.pop('to',None)
                 if to:
-                    print('sending to',len(firebase_queue),to)
+                    logger.info('Sending to',to)
                     xmpp.send_gcm(to,message)
 
         xmpp.disconnect(0.0)
-        print('Firebase Bridge %s exiting' % server_id)
+        logger.warning('Firebase Bridge %s exiting' % server_id)
         
 
     @cursored
@@ -121,11 +126,11 @@ class FirebaseBridge(models.Model):
 
     @cursored
     def on_receipt(self,data):
-        logging.info('Firebase Bridge %s receipt: %s' % (self.name, data))
+        logging.debug('Firebase Bridge %s receipt: %s' % (self.name, data))
         
     @cursored
     def on_message(self,message):
-        logging.info('Firebase Bridge %s received: %s' % (self.name, message.data))
+        logging.debug('Firebase Bridge %s received: %s' % (self.name, message.data))
         data = message.data.get('data')
         type = data.pop('type',None)
         if not type:
@@ -133,6 +138,7 @@ class FirebaseBridge(models.Model):
         if type == 'login':
             self.authenticate(message)
         else:
+            # TODO: extract key authentication function
             device = message.data.get('from')
             key = message.data.get('data').pop('key',None)
             session = self._get_session(device,key)
@@ -153,6 +159,10 @@ class FirebaseBridge(models.Model):
 
             
     def do_rpc(self,message):
+        ''' Make API call.
+            Response will be sent in FCM messages to device.
+            TODO: add option to NOT send response.
+        '''
         data = message.data.get('data')
         model = data.get('model')
         method = data.get('method')
@@ -160,7 +170,8 @@ class FirebaseBridge(models.Model):
         fn_kwargs = json.loads(data.get('kwargs','{}'))
         user_id = message.data.get('user_id')
         
-        print('do_rpc',user_id,model,method, fn_args,fn_kwargs)
+        logger.debug('do_rpc (uid:%s): %s,%s,%s,%s' % (user_id,model,method, fn_args,fn_kwargs))
+        
         obj = self.env[model].with_user(user_id)
         fn = getattr(obj,method)
         
@@ -192,12 +203,12 @@ class FirebaseBridge(models.Model):
         logging.debug('Firebase Bridge %s authenticating: %s' % (self, message.data.get('data')))
         data = message.data.get('data')
         dbname = self.env.cr.dbname
-        logging.info('Firebase Bridge calling authenticate %s,%s' % (dbname,data.get('username')))
+        logging.debug('Firebase Bridge calling authenticate %s,%s' % (dbname,data.get('username')))
         try:
             uid =  self.env['res.users'].authenticate(dbname,data.get('username'), data.get('password'),{})
             user = self.env['res.users'].browse(uid)
-            #print('Logged in %s: %s, %s' % (uid,user, user.partner_id))
             if (uid):
+                logging.info('Firebase Bridge new session %s,%s' % (user.name, device))
                 #first close all sessions from same device
                 device= message.data.get('from')
                 FirebaseSession = self.env['firebase.session']
@@ -215,7 +226,6 @@ class FirebaseBridge(models.Model):
                 }
                 session = FirebaseSession.create(values)
                 self.env.cr.commit()
-                print('Session',session,session.user_id)
                 data = {
                     'key': session.key,
                     'uid' : uid,
@@ -229,6 +239,7 @@ class FirebaseBridge(models.Model):
                 }
                 self.send_message(message)
         except AccessDenied:
+            logging.warn('Firebase Bridge login denied %s@%s' % (data.get('username'), message.data.get('from')))
             message = {
                 'to': message.data.get('from'),
                 'type': 'login-nack',

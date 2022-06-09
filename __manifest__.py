@@ -11,14 +11,13 @@
         
     """,
 
-    'author': "BartaTech",
-    'website': "http://www.bartatech.com",
+    'author': "Julio Santa Cruz <bartacruz@gmail.com>",
     'category': 'Extra Tools',
-    'version': '15.0.0.1',
+    'version': '15.0.0.2',
     "license": "AGPL-3",
     'installable': True,
     'application': True,
-    "development_status": "Alpha",
+    "development_status": "Beta",
     
     # any module necessary for this one to work correctly
     'depends': ['base'],
