@@ -1,0 +1,6 @@
+<odoo>
+    <!-- Main Menu -->
+    <menuitem id="root" name="Firebase Bridge" sequence="10" web_icon="firebase_bridge,static/description/icon.png" />
+    <menuitem id="bridges" name="Bridges" sequence="10" parent="root" action="action_firebase_bridges"/>
+    <menuitem id="sessions" name="Sessions" sequence="20" parent="root" action="action_firebase_sessions"/>
+</odoo>
