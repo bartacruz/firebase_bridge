@@ -101,7 +101,7 @@ class FirebaseBridge(models.Model):
                 message = firebase_queue.pop()
                 to = message.pop('to',None)
                 if to:
-                    logger.info('Sending to',to)
+                    logger.info('Sending to %s' % to)
                     xmpp.send_gcm(to,message)
 
         xmpp.disconnect(0.0)
@@ -208,9 +208,9 @@ class FirebaseBridge(models.Model):
             uid =  self.env['res.users'].authenticate(dbname,data.get('username'), data.get('password'),{})
             user = self.env['res.users'].browse(uid)
             if (uid):
+                device= message.data.get('from')
                 logging.info('Firebase Bridge new session %s,%s' % (user.name, device))
                 #first close all sessions from same device
-                device= message.data.get('from')
                 FirebaseSession = self.env['firebase.session']
                 FirebaseSession.search([('device','=',device)]).write({'closed':True})
                 
@@ -249,7 +249,7 @@ class FirebaseBridge(models.Model):
 
     def send_to_partner(self,partner_id,model,obj):
         ''' Sends a message to all active sessions related to partner'''
-        logger.debug('send_to_partner %s, %s, %s ' % (partner_id,model,obj))
+        logger.info('send_to_partner %s, %s, %s ' % (partner_id,model,obj))
         if not isinstance(obj,str):
             obj = json.dumps(obj, default=date_utils.json_default)
             
