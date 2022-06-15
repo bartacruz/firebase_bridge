@@ -198,6 +198,22 @@ class FirebaseBridge(models.Model):
                 }
                 self.send_message(msg)
                 
+
+    def _oauth_authenticate(self,data):
+        userid = self.env['res.users'].search(['&',['login','=',data.get('username')],['active','=',True]])
+        if not userid:
+            return False
+        user = self.env['res.users'].browse(userid)
+        print('_oauth_authenticate',userid,user,data)
+        try:
+            validation = self.env['res.users']._auth_oauth_validate(user.oauth_provider_id,data.get('password'))
+            print('_oauth_authenticate validation:',validation)
+            if validation['user_id'] == user.oauth_uid:
+                return userid
+        except:
+            pass
+        return False
+        
                     
     def authenticate(self,message):
         logging.debug('Firebase Bridge %s authenticating: %s' % (self, message.data.get('data')))
@@ -209,48 +225,55 @@ class FirebaseBridge(models.Model):
                 dbname,
                 data.get('username'), 
                 data.get('password'),
-                {'interactive':True}
+                {'interactive':False}
             )
-            user = self.env['res.users'].browse(uid)
-            if (uid):
-                device= message.data.get('from')
-                logging.info('Firebase Bridge new session %s,%s' % (user.name, device))
-                #first close all sessions from same device
-                FirebaseSession = self.env['firebase.session']
-                FirebaseSession.search([('device','=',device)]).write({'closed':True})
-                
-                # Create new session
-                values = {
-                    'bridge_id': self.id,
-                    'device': device,
-                    'user_id' : uid,
-                    'partner_id': user.partner_id.id,
-                    'key':str(uuid.uuid4())[:8],
-                    'last': fields.Datetime.now(),
-                    'closed': False
-                }
-                session = FirebaseSession.create(values)
-                self.env.cr.commit()
-                data = {
-                    'key': session.key,
-                    'uid' : uid,
-                    'name': user.name,
-                    'partner_id': user.partner_id.id
-                }
-                message = {
-                    'to': session.device,
-                    'type': 'login-ack',
-                    'data': json.dumps(data, default=date_utils.json_default)
-                }
-                self.send_message(message)
         except AccessDenied:
             logging.warning('Firebase Bridge login denied %s@%s' % (data.get('username'), message.data.get('from')))
+            oauth_uid = self._oauth_authenticate(data)
+            if oauth_uid:
+                uid = oauth_uid;
+            else:
+                message = {
+                    'to': message.data.get('from'),
+                    'type': 'login-nack',
+                    'data': '{}'
+                }
+                self.send_message(message)
+                return
+            
+        user = self.env['res.users'].browse(uid)
+        if (uid):
+            device= message.data.get('from')
+            logging.info('Firebase Bridge new session %s,%s' % (user.name, device))
+            #first close all sessions from same device
+            FirebaseSession = self.env['firebase.session']
+            FirebaseSession.search([('device','=',device)]).write({'closed':True})
+            
+            # Create new session
+            values = {
+                'bridge_id': self.id,
+                'device': device,
+                'user_id' : uid,
+                'partner_id': user.partner_id.id,
+                'key':str(uuid.uuid4())[:8],
+                'last': fields.Datetime.now(),
+                'closed': False
+            }
+            session = FirebaseSession.create(values)
+            self.env.cr.commit()
+            data = {
+                'key': session.key,
+                'uid' : uid,
+                'name': user.name,
+                'partner_id': user.partner_id.id
+            }
             message = {
-                'to': message.data.get('from'),
-                'type': 'login-nack',
-                'data': '{}'
+                'to': session.device,
+                'type': 'login-ack',
+                'data': json.dumps(data, default=date_utils.json_default)
             }
             self.send_message(message)
+        
 
     def send_to_partner(self,partner_id,model,obj):
         ''' Sends a message to all active sessions related to partner'''
