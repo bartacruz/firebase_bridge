@@ -6,7 +6,7 @@ import logging
 import threading
 import uuid
 
-from psutil import AccessDenied
+from odoo.exceptions import AccessDenied
 from odoo import _, api, models, fields
 from odoo.tools import date_utils
 from xmppgcm import GCM, XMPPEvent
@@ -182,7 +182,7 @@ class FirebaseBridge(models.Model):
             ret = json.loads(ret)
         elif inspect.isclass(ret):
             ret = ret.read()
-        elif isinstance(obj,models.Model):
+        elif isinstance(ret,models.Model):
             ret = ret.read()
         #print('do_rpc ret:',len(ret), type(ret),ret)
         
@@ -205,7 +205,12 @@ class FirebaseBridge(models.Model):
         dbname = self.env.cr.dbname
         logging.debug('Firebase Bridge calling authenticate %s,%s' % (dbname,data.get('username')))
         try:
-            uid =  self.env['res.users'].authenticate(dbname,data.get('username'), data.get('password'),{})
+            uid =  self.env['res.users'].authenticate(
+                dbname,
+                data.get('username'), 
+                data.get('password'),
+                {'interactive':False}
+            )
             user = self.env['res.users'].browse(uid)
             if (uid):
                 device= message.data.get('from')
