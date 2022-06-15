@@ -209,7 +209,7 @@ class FirebaseBridge(models.Model):
                 dbname,
                 data.get('username'), 
                 data.get('password'),
-                {'interactive':False}
+                {'interactive':True}
             )
             user = self.env['res.users'].browse(uid)
             if (uid):
@@ -244,7 +244,7 @@ class FirebaseBridge(models.Model):
                 }
                 self.send_message(message)
         except AccessDenied:
-            logging.warn('Firebase Bridge login denied %s@%s' % (data.get('username'), message.data.get('from')))
+            logging.warning('Firebase Bridge login denied %s@%s' % (data.get('username'), message.data.get('from')))
             message = {
                 'to': message.data.get('from'),
                 'type': 'login-nack',
