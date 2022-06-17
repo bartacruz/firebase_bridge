@@ -1,3 +1,4 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
 access_firebase_bridge_user,frebase.bridge.user,model_firebase_bridge,base.group_user,1,1,1,1
 access_firebase_session_user,firebase.session.user,model_firebase_session,base.group_user,1,1,1,1
+access_firebase_message_user,firebase.message.user,model_firebase_message,base.group_user,1,1,1,1

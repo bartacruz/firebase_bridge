@@ -1,0 +1,9 @@
+<odoo noupdate="1">
+    <!-- Sequence for towing.order -->
+    <record id="seq_firebase_message" model="ir.sequence">
+        <field name="name">Firebase Message Sequence</field>
+        <field name="code">firebase.message</field>
+        <field name="prefix">FBM</field>
+        <field name="padding">9</field>
+    </record>
+</odoo>

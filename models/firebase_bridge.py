@@ -43,15 +43,14 @@ class FirebaseBridge(models.Model):
     server_domain = fields.Char('Firebase domain', default= 'fcm.googleapis.com')
     use_ssl = fields.Boolean(_('Use SSL'), default=True)
     connected = fields.Boolean(_('Connected'), default=False)
-    session_ids = fields.One2many(comodel_name='firebase.session',inverse_name='bridge_id', string='Sessions')
+    session_ids = fields.One2many(comodel_name='firebase.session',inverse_name='bridge_id', string='Sessions')    
     
     def connect(self):
         logger.debug("Fireserver %s connecting" % self.id)
         #self.write({'connected': False})
         self.connected = False
         thread_name = 'firebase-%s' % self.id
-        thread = threading.Thread(name=thread_name,target=self._run_thread, args=(self.id,))
-        thread.firebase_queue = []
+        thread = threading.Thread(name=thread_name,target=self._run_thread, args=(self.id, self.server, self.port, self.use_ssl,self.server_id, self.server_domain,self.server_key))        
         thread.start()
     
     def get_thread(self):
@@ -60,21 +59,40 @@ class FirebaseBridge(models.Model):
         for t in threading.enumerate():
             if t.name == thread_name:
                 return t
+    
+    def _get_messages(self):
+        return self.env['firebase.message'].search([('sent','=',None)])
         
     def disconnect(self):
         t = self.get_thread()
         if t:
             t._fstopped = True
-        
+
     @cursored
-    def _run_thread(self,server_id):
-        logger.info("Starting Firebase thread %s" % server_id)
+    def message_loop(self, xmpp):
+        logger.info("[Firebase Bridge] Checking messages")
+        for message in self._get_messages():
+            rtt = fields.Datetime.now()
+            msg = {
+                'type': message.type,
+                'model': message.model,
+                'data': message.data
+            }
+            for device in self._get_partner_devices(message):
+                xmpp.send_gcm(device,msg)
+                logger.info('[Firebase Bridge] Message %s sent to %s in %s',message.name, message.partner_id, (fields.Datetime.now() - rtt).total_seconds() )
+            message.sent = fields.Datetime.now()
+
+    
+    def _run_thread(self,bridge_id,server,port,use_ssl,server_id,server_domain,server_key):
+        
+        logger.info("Starting Firebase thread %s: %s,%s,%s,%s,%s,%s", bridge_id,server,port,use_ssl,server_id,server_domain,server_key)
         t = threading.currentThread()
         t._fstopped = False
         t._attempts = 0
-        t.server = self.server
-        t.port = self.port
-        t.use_ssl = self.use_ssl
+        t.server = server
+        t.port = port
+        t.use_ssl = use_ssl
         
         try:
             asyncio.get_event_loop()
@@ -84,28 +102,22 @@ class FirebaseBridge(models.Model):
             # This is a work-around to this problem
             asyncio.set_event_loop(asyncio.new_event_loop())
         
-        xmpp = GCM('%s@%s' % (self.server_id, self.server_domain), self.server_key)
+        xmpp = GCM('%s@%s' % (server_id, server_domain), server_key)
         t.xmpp = xmpp
-        xmpp.default_port = self.port
+        xmpp.default_port = port
 
         xmpp.add_event_handler(XMPPEvent.CONNECTED, self.on_connected)
         xmpp.add_event_handler(XMPPEvent.DISCONNECTED, self.on_disconnected)
         xmpp.add_event_handler(XMPPEvent.RECEIPT, self.on_receipt)
         xmpp.add_event_handler(XMPPEvent.MESSAGE, self.on_message)
-        xmpp.connect((t.server, t.port), use_ssl=t.use_ssl) 
+        xmpp.connect((server, port), use_ssl=use_ssl) 
         
         while not threading.currentThread()._fstopped:
             xmpp.process(forever=True, timeout=5)
-            firebase_queue = threading.currentThread().firebase_queue
-            while len(firebase_queue) > 0:
-                message = firebase_queue.pop()
-                to = message.pop('to',None)
-                if to:
-                    logger.info('Sending to %s' % to)
-                    xmpp.send_gcm(to,message)
+            self.message_loop(xmpp)          
 
         xmpp.disconnect(0.0)
-        logger.warning('Firebase Bridge %s exiting' % server_id)
+        logger.warning('Firebase Bridge %s exiting' % bridge_id)
         
 
     @cursored
@@ -119,9 +131,9 @@ class FirebaseBridge(models.Model):
         logging.info('Firebase Bridge %s disconnected' % self.name)
         self.connected = False
         t = self.get_thread()
-        if t._attempts < 5:
+        if t._attempts < 3:
             t._attempts = t._attempts +1
-            logging.info('Firebase Bridge %s reconnecting. attempt #%s' % (self.id, t.attempts))
+            logging.info('Firebase Bridge %s reconnecting. attempt #%s' % (self.id, t._attempts))
             t.xmpp.connect((self.server, self.port), use_ssl=self.use_ssl) 
 
     @cursored
@@ -150,7 +162,14 @@ class FirebaseBridge(models.Model):
                     self.do_rpc(message)
             else:
                 logger.warning('Unauthorized access. device:%s, key:%s, data:%s' % (device,key,message.data.get('data')))
-            
+
+    def _get_partner_devices(self,message):
+        if message.device:
+            return [message.device]
+        sessions = self.session_ids.filtered(lambda x: x.partner_id.id == message.partner_id.id and x.active == True)
+        logger.info('_get_partner_devices sessions: %s' % sessions)
+        return [s.device for s in sessions]
+    
     def _get_session(self,device,key):
         FirebaseSession = self.env['firebase.session']
         session_id = FirebaseSession.search(['&',('device','=',device),('key','=',key)])
@@ -178,35 +197,42 @@ class FirebaseBridge(models.Model):
         ret = fn(*fn_args,**fn_kwargs)
         
         # Normalize return type
+        if not ret or isinstance(ret,bool):
+            return
         if isinstance(ret,str):
             ret = json.loads(ret)
         elif inspect.isclass(ret):
             ret = ret.read()
         elif isinstance(ret,models.Model):
             ret = ret.read()
-        #print('do_rpc ret:',len(ret), type(ret),ret)
+        
+        print('do_rpc ret:', type(ret),ret)
         
         if ret:
             for obj in ret:
                 if isinstance(obj,models.Model):
                     obj = obj.read()[0]
                 msg = {
-                    'to': message.data.get('from'),
+                    'bridge_id': self.id,
+                    'device': message.data.get('from'),
                     'type': 'object',
                     'model': model,
                     'data': json.dumps(obj, default=date_utils.json_default)
                 }
-                self.send_message(msg)
-                
+                self.create_message(msg)
 
+    def create_message(self, vals):
+        msg = self.env['firebase.message'].create(vals)
+        logger.info('%s: created firebase message %s for %s (type:%s, model:%s)',self._name,msg.name,msg.partner_id,msg.type,msg.model)
+            
     def _oauth_authenticate(self,data):
         userid = self.env['res.users'].search(['&',['login','=',data.get('username')],['active','=',True]])
         if not userid:
             return False
-        user = self.env['res.users'].browse(userid)
+        user = self.env['res.users'].browse(userid[0].id)
         print('_oauth_authenticate',userid,user,data)
         try:
-            validation = self.env['res.users']._auth_oauth_validate(user.oauth_provider_id,data.get('password'))
+            validation = self.env['res.users']._auth_oauth_validate(user.oauth_provider_id.id,data.get('password'))
             print('_oauth_authenticate validation:',validation)
             if validation['user_id'] == user.oauth_uid:
                 return userid
@@ -228,17 +254,18 @@ class FirebaseBridge(models.Model):
                 {'interactive':False}
             )
         except AccessDenied:
-            logging.warning('Firebase Bridge login denied %s@%s' % (data.get('username'), message.data.get('from')))
+            logging.debug('Firebase Bridge calling oauth %s,%s' % (dbname,data.get('username')))
             oauth_uid = self._oauth_authenticate(data)
             if oauth_uid:
                 uid = oauth_uid;
             else:
+                logging.warning('Firebase Bridge login denied %s@%s' % (data.get('username'), message.data.get('from')))
                 message = {
-                    'to': message.data.get('from'),
+                    'device': message.data.get('from'),
                     'type': 'login-nack',
                     'data': '{}'
                 }
-                self.send_message(message)
+                self.create_message(message)
                 return
             
         user = self.env['res.users'].browse(uid)
@@ -268,11 +295,12 @@ class FirebaseBridge(models.Model):
                 'partner_id': user.partner_id.id
             }
             message = {
-                'to': session.device,
+                'device': session.device,
                 'type': 'login-ack',
+                'partner_id': user.partner_id.id,
                 'data': json.dumps(data, default=date_utils.json_default)
             }
-            self.send_message(message)
+            self.create_message(message)
         
 
     def send_to_partner(self,partner_id,model,obj):
@@ -282,21 +310,20 @@ class FirebaseBridge(models.Model):
             obj = json.dumps(obj, default=date_utils.json_default)
             
         msg = {
+            'bridge_id': self.id,
             'type': 'object',
             'model': model,
-            'data': obj
+            'data': obj,
+            'partner_id': partner_id,
             }
-        
         sessions = self.session_ids.filtered(lambda x: x.partner_id.id == partner_id and x.active == True)
-        logger.debug('send_to_partner sessions: %s' % sessions)
-        
         for session in sessions:
-            msg['to']=session.device
-            self.send_message(msg)
-                
-    def send_message(self,message):
-        t = self.get_thread()
-        if t:
-            t.firebase_queue.append(message)
-        else:
-            logger.warning('send_message: Firebase Bridge thread for %s not found' % self.name)
+            logger.debug('send_to_partner device: %s' % session.device)
+            msg['device']=session.device
+            self.create_message(msg)
+    
+    @api.model
+    def clean_start(self):
+        self.env['firebase.bridge'].search([]).write({'connected':False})
+
+

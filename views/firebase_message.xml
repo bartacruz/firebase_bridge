@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Operations -->
+    <record id="firebase_message_form" model="ir.ui.view">
+        <field name="name">Firebase Bridge Message</field>
+        <field name="model">firebase.message</field>
+        <field name="arch" type="xml">
+            <form string="firebase message">
+                <sheet>
+                    <div class="oe_title">
+                        <h1>
+                            <field name="name" />
+                        </h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="bridge_id" />
+                            <field name="partner_id" />
+                            <field name="type" />
+                            <field name="model" 
+                            attrs="{'invisible':[('model','!=','object')]}"
+                            />
+                        </group>
+                        <group>
+                            <field name="created" />
+                            <field name="sent" />
+                        </group>
+                    </group>
+                    <field name="data" />
+                </sheet>
+            </form>
+        </field>
+    </record>
+    <record id="firebase_message_tree_view" model="ir.ui.view">
+        <field name="name">Firebase Bridge Message Tree</field>
+        <field name="model">firebase.message</field>
+        <field name="arch" type="xml">
+            <tree name="firebase_messages" string="Firebase Bridge Messages" create="false">
+                <field name="name" />
+                <field name="bridge_id" />
+                <field name="partner_id" />
+                <field name="type" />
+                <field name="model" />
+                <field name="created" />
+                <field name="sent" />
+                <field name="device" />
+            </tree>
+        </field>
+    </record>
+
+    <record id="action_firebase_messages" model="ir.actions.act_window">
+        <field name="name">Firebase Messages</field>
+        <field name="res_model">firebase.message</field>
+        <field name="view_mode">tree,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                No messages yet!
+            </p>
+        </field>
+    </record>
+</odoo>

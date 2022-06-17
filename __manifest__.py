@@ -24,8 +24,10 @@
     
     # always loaded
     'data': [
+        'data/ir_sequence.xml',
         'security/ir.model.access.csv',
         'views/firebase_bridge.xml',
+        'views/firebase_message.xml',
         'views/firebase_session.xml',
         'views/menu.xml',
     ],
