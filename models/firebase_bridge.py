@@ -185,6 +185,9 @@ class FirebaseBridge(models.Model):
         data = message.data.get('data')
         model = data.get('model')
         method = data.get('method')
+        split_method = method.split('-nr')
+        method = split_method[0]
+        no_return = len(split_method) > 1
         fn_args = json.loads(data.get('args','[]'))
         fn_kwargs = json.loads(data.get('kwargs','{}'))
         user_id = message.data.get('user_id')
@@ -197,7 +200,7 @@ class FirebaseBridge(models.Model):
         ret = fn(*fn_args,**fn_kwargs)
         
         # Normalize return type
-        if not ret or isinstance(ret,bool):
+        if no_return or not ret or isinstance(ret,bool):
             return
         if isinstance(ret,str):
             ret = json.loads(ret)
