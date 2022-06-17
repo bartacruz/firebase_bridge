@@ -238,7 +238,7 @@ class FirebaseBridge(models.Model):
             validation = self.env['res.users']._auth_oauth_validate(user.oauth_provider_id.id,data.get('password'))
             print('_oauth_authenticate validation:',validation)
             if validation['user_id'] == user.oauth_uid:
-                return userid
+                return userid[0].id
         except:
             pass
         return False
