@@ -26,6 +26,7 @@
     'data': [
         'data/ir_sequence.xml',
         'security/ir.model.access.csv',
+        'security/firebase_security.xml',
         'views/firebase_bridge.xml',
         'views/firebase_message.xml',
         'views/firebase_session.xml',
