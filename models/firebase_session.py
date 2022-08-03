@@ -6,7 +6,8 @@ class FirebaseSession(models.Model):
     _name = 'firebase.session'
     _description = 'Firebase Bridge device session'
     _rec_name = 'device'
-        
+    _sort = 'last desc'
+    
     device = fields.Char(
         string=_('Device ID'),
         required=True,

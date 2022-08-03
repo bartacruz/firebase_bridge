@@ -156,7 +156,7 @@ class FirebaseBridge(models.Model):
             device = message.data.get('from')
             key = message.data.get('data').pop('key',None)
             session = self._get_session(device,key)
-            if (session):
+            if session:
                 session.last = fields.Datetime.now()
                 message.data['key'] = key
                 message.data['user_id'] = session.user_id.id
