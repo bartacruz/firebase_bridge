@@ -5,7 +5,7 @@ class FirebaseSession(models.Model):
     _description = 'Firebase Bridge device session'
     _rec_name = 'device'
     
-    SESSION_TIMEOUT = 60*60*24 # 1 day
+    SESSION_TIMEOUT = 60*60 # 1 hour
     
     device = fields.Char(
         string=_('Device ID'),
@@ -23,7 +23,7 @@ class FirebaseSession(models.Model):
     
     @api.depends('last', 'closed')
     def _compute_active(self):
-        print("computing active", self)
         for record in self:
-            record.active = not record.closed and record.last and (fields.Datetime.now() - record.last).seconds <  self.SESSION_TIMEOUT
+            record.active = not record.closed and record.last and (fields.Datetime.now() - record.last).total_seconds() <  self.SESSION_TIMEOUT
+            print("computing active", record, record.user_id.name, record.active, record.closed,record.last,(fields.Datetime.now() - record.last).total_seconds(),self.SESSION_TIMEOUT)        
     

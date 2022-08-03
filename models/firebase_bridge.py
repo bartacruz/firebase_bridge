@@ -328,5 +328,10 @@ class FirebaseBridge(models.Model):
     @api.model
     def clean_start(self):
         self.env['firebase.bridge'].search([]).write({'connected':False})
+    
+    def check_sessions(self):
+        for record in self:
+            record.session_ids._compute_active()
+        return True
 
 

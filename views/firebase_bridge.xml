@@ -10,6 +10,8 @@
                 <header>
                     <button class="oe_highlight" type="object" name="connect" string="Connect" context="{'firebase_id': active_id}" attrs="{'invisible': [('connected', '=', True)]}" />
                     <button class="btn-danger" type="object" name="disconnect" string="Disconnect" context="{'firebase_id': active_id}" attrs="{'invisible': [('connected', '=', False)]}" />
+                    <button class="oe_highlight" type="object" name="check_sessions" string="Check sessions" context="{'firebase_id': active_id}" />
+                    
                 </header>
                 
                 <sheet>
