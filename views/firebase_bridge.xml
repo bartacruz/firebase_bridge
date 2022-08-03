@@ -26,6 +26,7 @@
                             <field name="server" />
                             <field name="port" />
                             <field name="use_ssl" />
+                            <field name="session_timeout" />
                         </group>
                         <group>
                             <field name="server_id" />

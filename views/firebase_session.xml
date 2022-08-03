@@ -38,7 +38,7 @@
         <field name="name">Firebase Bridge Session Tree</field>
         <field name="model">firebase.session</field>
         <field name="arch" type="xml">
-            <tree name="firebase_sessions" string="Firebase Bridge Sessions" create="false">
+            <tree name="firebase_sessions" string="Firebase Bridge Sessions" create="false" default_order="last desc">
                 <field name="bridge_id" />
                 <field name="user_id" />
                 <field name="partner_id" />
