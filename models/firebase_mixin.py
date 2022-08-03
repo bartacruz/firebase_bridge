@@ -16,7 +16,7 @@ class FirebaseMixin(models.AbstractModel):
         
         firebase_bridge_id = self.env['ir.config_parameter'].sudo().get_param('towing.firebase_bridge')
         firebase_bridge = self.env['firebase.bridge'].sudo().browse(int(firebase_bridge_id))
-        if firebase_bridge:
+        if firebase_bridge and firebase_bridge.connected :
             firebase_bridge.send_to_partner(partner_id,self._name,ev)
         
     

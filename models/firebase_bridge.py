@@ -44,6 +44,7 @@ class FirebaseBridge(models.Model):
     use_ssl = fields.Boolean(_('Use SSL'), default=True)
     connected = fields.Boolean(_('Connected'), default=False)
     session_ids = fields.One2many(comodel_name='firebase.session',inverse_name='bridge_id', string='Sessions')    
+    session_timeout = fields.Integer(_('Session Timeout'),default=600)
     
     def connect(self):
         logger.debug("Fireserver %s connecting" % self.id)
@@ -78,7 +79,8 @@ class FirebaseBridge(models.Model):
                 'model': message.model,
                 'data': message.data
             }
-            for device in self._get_partner_devices(message):
+            devices = self._get_partner_devices(message)
+            for device in devices:
                 xmpp.send_gcm(device,msg)
                 logger.info('[Firebase Bridge] Message %s sent to %s in %s',message.name, message.partner_id, (fields.Datetime.now() - rtt).total_seconds() )
             message.sent = fields.Datetime.now()
@@ -264,6 +266,7 @@ class FirebaseBridge(models.Model):
             else:
                 logging.warning('Firebase Bridge login denied %s@%s' % (data.get('username'), message.data.get('from')))
                 message = {
+                    'bridge_id': self.id,
                     'device': message.data.get('from'),
                     'type': 'login-nack',
                     'data': '{}'
@@ -332,6 +335,14 @@ class FirebaseBridge(models.Model):
     def check_sessions(self):
         for record in self:
             record.session_ids._compute_active()
+        return True
+    
+    def ping_sessions(self):
+        for record in self:
+            for s in record.session_ids.filtered(lambda x: x.active):
+                print("_ping_sessions",(fields.Datetime.now() - s.last).total_seconds(),record.session_timeout/2)
+                if (fields.Datetime.now() - s.last).total_seconds() > record.session_timeout/2:
+                    s.ping()
         return True
 
 

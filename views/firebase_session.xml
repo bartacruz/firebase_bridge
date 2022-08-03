@@ -7,13 +7,16 @@
         <field name="model">firebase.session</field>
         <field name="arch" type="xml">
             <form string="firebase session">
+                <header>
+                    <button class="oe_highlight" type="object" name="ping" string="Ping" context="{'firebase_id': active_id}" />
+                </header>
                 <sheet>
                     <div class="oe_title">
                         <h1>
                             <field name="user_id" />
                         </h1>
                         <field name="bridge_id" />
-                        <hr/>
+                        <hr />
                     </div>
                     <group>
                         <group>
