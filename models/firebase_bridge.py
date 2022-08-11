@@ -146,10 +146,10 @@ class FirebaseBridge(models.Model):
     def on_message(self,message):
         logging.debug('Firebase Bridge %s received: %s' % (self.name, message.data))
         data = message.data.get('data')
-        type = data.pop('type',None)
-        if not type:
+        msg_type = data.pop('type',None)
+        if not msg_type:
             return
-        if type == 'login':
+        if msg_type == 'login':
             self.authenticate(message)
         else:
             # TODO: extract key authentication function
@@ -160,7 +160,7 @@ class FirebaseBridge(models.Model):
                 session.last = fields.Datetime.now()
                 message.data['key'] = key
                 message.data['user_id'] = session.user_id.id
-                if type == 'rpc':
+                if msg_type == 'rpc':
                     self.do_rpc(message)
             else:
                 logger.warning('Unauthorized access. device:%s, key:%s, data:%s' % (device,key,message.data.get('data')))
