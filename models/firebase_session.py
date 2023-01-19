@@ -39,3 +39,15 @@ class FirebaseSession(models.Model):
                     }
                 _logger.info("Pinging %s@%s" % (record.user_id.name, record.key,))
                 record.bridge_id.create_message(msg)
+    
+    def notify(self):
+        for record in self:
+            if record.bridge_id.connected:
+                msg = {
+                    'bridge_id': record.bridge_id.id,
+                    'device': record.device,
+                    'type': 'notification',
+                    'data': {},
+                    }
+                _logger.info("Notifying %s@%s" % (record.user_id.name, record.key,))
+                record.bridge_id.create_message(msg)

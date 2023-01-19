@@ -9,6 +9,7 @@
             <form string="firebase session">
                 <header>
                     <button class="oe_highlight" type="object" name="ping" string="Ping" context="{'firebase_id': active_id}" />
+                    <button class="oe_highlight" type="object" name="notify" string="Notify" context="{'firebase_id': active_id}" />
                 </header>
                 <sheet>
                     <div class="oe_title">

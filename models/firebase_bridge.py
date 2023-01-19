@@ -77,11 +77,30 @@ class FirebaseBridge(models.Model):
             msg = {
                 'type': message.type,
                 'model': message.model,
-                'data': message.data
+                'data': message.data,
+                'collapse_key': 'ping',
+                
             }
+            options = {}
+            if message.type == 'notification':
+                options = {
+                    'notification': {
+                        'title':'Notification test',
+                        'body': 'Hola, que tal',
+                        'android_channel_id': 'fbtestch',
+                        # 'click_action': 'clicketiclick',
+                        'actions': [{
+                            'title': 'button',
+                            'action': 'button-click',
+                            'icon': 'icons/icon.png'
+                        }],
+                        'papepp': 123,
+                    },
+                }
+            print(msg,options)
             devices = self._get_partner_devices(message)
             for device in devices:
-                xmpp.send_gcm(device,msg)
+                xmpp.send_gcm(device,msg,options=options)
                 logger.info('[Firebase Bridge] Message %s sent to %s in %s',message.name, message.partner_id, (fields.Datetime.now() - rtt).total_seconds() )
             message.sent = fields.Datetime.now()
 
@@ -145,6 +164,7 @@ class FirebaseBridge(models.Model):
     @cursored
     def on_message(self,message):
         logging.debug('Firebase Bridge %s received: %s' % (self.name, message.data))
+        print('Firebase Bridge %s received: %s' % (self.name, message.data))
         data = message.data.get('data')
         msg_type = data.pop('type',None)
         if not msg_type:
@@ -162,6 +182,8 @@ class FirebaseBridge(models.Model):
                 message.data['user_id'] = session.user_id.id
                 if msg_type == 'rpc':
                     self.do_rpc(message)
+                elif msg_type == 'pong':
+                    print("pong received from",device,key)
             else:
                 logger.warning('Unauthorized access. device:%s, key:%s, data:%s' % (device,key,message.data.get('data')))
 
@@ -174,7 +196,8 @@ class FirebaseBridge(models.Model):
     
     def _get_session(self,device,key):
         FirebaseSession = self.env['firebase.session']
-        session_id = FirebaseSession.search(['&',('device','=',device),('key','=',key)])
+        session_id = FirebaseSession.search(['&',('device','=',device),('key','=',key),('active','=',True)])
+        print('_get_session:',session_id,key,device)
         if session_id:
             return FirebaseSession.browse(int(session_id[0]))
 
@@ -245,71 +268,90 @@ class FirebaseBridge(models.Model):
             pass
         return False
         
-                    
+    def authenticate_session(self,data,device):
+        key = data.get('key')
+        session = self._get_session(device,key)
+        logging.info('Firebase Bridge calling authenticate session for %s= %s' % (key,session))
+        if session:
+            self.send_login_ack(session)
+        else:
+            self.send_login_nack(device)
+        
+            
+    def send_login_ack(self,session):
+        user = session.user_id
+        data = {
+            'key': session.key,
+            'uid' : user.id,
+            'name': user.name,
+            'partner_id': user.partner_id.id
+        }
+        message = {
+            'device': session.device,
+            'type': 'login-ack',
+            'partner_id': user.partner_id.id,
+            'data': json.dumps(data, default=date_utils.json_default)
+        }
+        self.create_message(message)
+        
+    def send_login_nack(self,device):
+        message = {
+            'bridge_id': self.id,
+            'device': device,
+            'type': 'login-nack',
+            'data': '{}'
+        }
+        self.create_message(message)
+        
     def authenticate(self,message):
         logging.debug('Firebase Bridge %s authenticating: %s' % (self, message.data.get('data')))
         data = message.data.get('data')
         dbname = self.env.cr.dbname
-        logging.debug('Firebase Bridge calling authenticate %s,%s' % (dbname,data.get('username')))
-        try:
-            uid =  self.env['res.users'].authenticate(
-                dbname,
-                data.get('username'), 
-                data.get('password'),
-                {'interactive':False}
-            )
-        except AccessDenied:
-            logging.debug('Firebase Bridge calling oauth %s,%s' % (dbname,data.get('username')))
-            oauth_uid = self._oauth_authenticate(data)
-            if oauth_uid:
-                uid = oauth_uid;
-            else:
-                logging.warning('Firebase Bridge login denied %s@%s' % (data.get('username'), message.data.get('from')))
-                message = {
-                    'bridge_id': self.id,
-                    'device': message.data.get('from'),
-                    'type': 'login-nack',
-                    'data': '{}'
-                }
-                self.create_message(message)
-                return
-            
+        key = data.get('key',None)
+        device = message.data.get('from')
+        if key:
+            self.authenticate_session(data,device)
+            return
+        else:
+            logging.debug('Firebase Bridge calling authenticate %s,%s' % (dbname,data.get('username')))
+            try:
+                uid =  self.env['res.users'].authenticate(
+                    dbname,
+                    data.get('username'), 
+                    data.get('password'),
+                    {'interactive':False}
+                )
+            except AccessDenied:
+                logging.debug('Firebase Bridge calling oauth %s,%s' % (dbname,data.get('username')))
+                uid = self._oauth_authenticate(data)
+            if not uid:
+                logging.warning('Firebase Bridge login denied %s@%s' % (data.get('username'), device))
+                    
+        if not uid:
+            self.send_login_nack(device)
+            return
+                
         user = self.env['res.users'].browse(uid)
-        if (uid):
-            device= message.data.get('from')
-            logging.info('Firebase Bridge new session %s,%s' % (user.name, device))
-            #first close all sessions from same device
-            FirebaseSession = self.env['firebase.session']
-            FirebaseSession.search([('device','=',device)]).write({'closed':True})
-            
-            # Create new session
-            values = {
-                'bridge_id': self.id,
-                'device': device,
-                'user_id' : uid,
-                'partner_id': user.partner_id.id,
-                'key':str(uuid.uuid4())[:8],
-                'last': fields.Datetime.now(),
-                'closed': False
-            }
-            session = FirebaseSession.create(values)
-            self.env.cr.commit()
-            data = {
-                'key': session.key,
-                'uid' : uid,
-                'name': user.name,
-                'partner_id': user.partner_id.id
-            }
-            message = {
-                'device': session.device,
-                'type': 'login-ack',
-                'partner_id': user.partner_id.id,
-                'data': json.dumps(data, default=date_utils.json_default)
-            }
-            self.create_message(message)
+        logging.info('Firebase Bridge new session %s,%s' % (user.name, device))
+        #first close all sessions from same device
+        FirebaseSession = self.env['firebase.session']
+        FirebaseSession.search([('device','=',device)]).write({'closed':True})
         
-
-    def send_to_partner(self,partner_id,model,obj):
+        # Create new session
+        values = {
+            'bridge_id': self.id,
+            'device': device,
+            'user_id' : uid,
+            'partner_id': user.partner_id.id,
+            'key':str(uuid.uuid4())[:8],
+            'last': fields.Datetime.now(),
+            'closed': False
+        }
+        session = FirebaseSession.create(values)
+        self.env.cr.commit()
+        self.send_login_ack(session)
+        
+    def send_to_partner(self,partner_id,model,obj,notification=None):
         ''' Sends a message to all active sessions related to partner'''
         logger.info('send_to_partner %s, %s, %s ' % (partner_id,model,obj))
         if not isinstance(obj,str):
