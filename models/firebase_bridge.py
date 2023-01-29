@@ -364,7 +364,7 @@ class FirebaseBridge(models.Model):
             'data': obj,
             'partner_id': partner_id,
             }
-        sessions = self.session_ids.filtered(lambda x: x.partner_id.id == partner_id and x.active == True)
+        sessions = self.session_ids.filtered(lambda x: x.partner_id.id == partner_id and x.is_active == True)
         for session in sessions:
             logger.debug('send_to_partner device: %s' % session.device)
             msg['device']=session.device
