@@ -8,13 +8,19 @@
         <field name="arch" type="xml">
             <form string="firebase">
                 <header>
-                    <button class="oe_highlight" type="object" name="connect" string="Connect" context="{'firebase_id': active_id}" attrs="{'invisible': [('connected', '=', True)]}" />
-                    <button class="btn-danger" type="object" name="disconnect" string="Disconnect" context="{'firebase_id': active_id}" attrs="{'invisible': [('connected', '=', False)]}" />
-                    <button class="oe_highlight" type="object" name="check_sessions" string="Check sessions" context="{'firebase_id': active_id}" />
-                    <button class="oe_highlight" type="object" name="ping_sessions" string="Ping sessions" context="{'firebase_id': active_id}" />
-                    
+                    <button class="oe_highlight" type="object" name="connect" string="Connect"
+                        context="{'firebase_id': active_id}"
+                        attrs="{'invisible': [('connected', '=', True)]}" />
+                    <button class="btn-danger" type="object" name="disconnect" string="Disconnect"
+                        context="{'firebase_id': active_id}"
+                        attrs="{'invisible': [('connected', '=', False)]}" />
+                    <button class="oe_highlight" type="object" name="check_sessions"
+                        string="Check sessions" context="{'firebase_id': active_id}" />
+                    <button class="oe_highlight" type="object" name="ping_sessions"
+                        string="Ping sessions" context="{'firebase_id': active_id}" />
+
                 </header>
-                
+
                 <sheet>
                     <div class="oe_title">
                         <h1>
@@ -35,7 +41,16 @@
                             <field name="connected" />
                         </group>
                     </group>
-                    <field name="session_ids" />
+                    <field name="session_ids">
+                    <!-- <field name="open_session_ids" widget="one2many" domain="[('partner_id','=',False),('partner_id.id','=',23)]"> -->
+                        <tree>
+                            <field name="partner_id" />
+                            <field name="key" />
+                            <field name="last" />
+                            <field name="is_active" />
+                            <field name="closed" />
+                        </tree>
+                    </field>
                 </sheet>
 
             </form>

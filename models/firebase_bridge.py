@@ -177,7 +177,7 @@ class FirebaseBridge(models.Model):
             key = message.data.get('data').pop('key',None)
             session = self._get_session(device,key)
             if session:
-                session.last = fields.Datetime.now()
+                session.set_last(fields.Datetime.now())
                 message.data['key'] = key
                 message.data['user_id'] = session.user_id.id
                 if msg_type == 'rpc':
@@ -190,13 +190,13 @@ class FirebaseBridge(models.Model):
     def _get_partner_devices(self,message):
         if message.device:
             return [message.device]
-        sessions = self.session_ids.filtered(lambda x: x.partner_id.id == message.partner_id.id and x.active == True)
+        sessions = self.session_ids.filtered(lambda x: x.partner_id.id == message.partner_id.id and x.is_active == True)
         logger.info('_get_partner_devices sessions: %s' % sessions)
         return [s.device for s in sessions]
     
     def _get_session(self,device,key):
         FirebaseSession = self.env['firebase.session']
-        session_id = FirebaseSession.search(['&',('device','=',device),('key','=',key),('active','=',True)])
+        session_id = FirebaseSession.search(['&',('device','=',device),('key','=',key),('is_active','=',True)])
         print('_get_session:',session_id,key,device)
         if session_id:
             return FirebaseSession.browse(int(session_id[0]))
@@ -254,7 +254,7 @@ class FirebaseBridge(models.Model):
         logger.info('%s: created firebase message %s for %s (type:%s, model:%s)',self._name,msg.name,msg.partner_id,msg.type,msg.model)
             
     def _oauth_authenticate(self,data):
-        userid = self.env['res.users'].search(['&',['login','=',data.get('username')],['active','=',True]])
+        userid = self.env['res.users'].search(['&',['login','=',data.get('username')],['is_active','=',True]])
         if not userid:
             return False
         user = self.env['res.users'].browse(userid[0].id)
@@ -381,7 +381,7 @@ class FirebaseBridge(models.Model):
     
     def ping_sessions(self):
         for record in self:
-            for s in record.session_ids.filtered(lambda x: x.active):
+            for s in record.session_ids.filtered(lambda x: x.is_active):
                 print("_ping_sessions",(fields.Datetime.now() - s.last).total_seconds(),record.session_timeout/2)
                 if (fields.Datetime.now() - s.last).total_seconds() > record.session_timeout/2:
                     s.ping()

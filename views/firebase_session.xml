@@ -28,7 +28,7 @@
                         <group>
                             <field name="last" />
                             <field name="closed" />
-                            <field name="active" />
+                            <field name="is_active" />
                         </group>
                     </group>
                 </sheet>
@@ -46,7 +46,7 @@
                 <field name="key" />
                 <field name="last" />
                 <field name="closed" />
-                <field name="active" />
+                <field name="is_active" />
                 <field name="device" />
             </tree>
         </field>
@@ -60,6 +60,22 @@
             <p class="o_view_nocontent_smiling_face">
                 No sessions yet!
             </p>
+        </field>
+    </record>
+
+    <record id="firebase_session_filter" model="ir.ui.view">
+        <field name="name">Firebase Session Filter</field>
+        <field name="model">firebase.session</field>
+        <field name="priority" eval="15" />
+        <field name="arch" type="xml">
+            <search string="Search Sessions">
+                <field name="partner_id" />
+                <field name="key" />
+                <field name="device" />
+                <filter string="Active" domain="[('is_active', '=', True)]" name="active_firebase_sessions" />
+                <filter string="Open" domain="[('closed', '=', False)]" name="open_firebase_sessions" />
+                <filter string="closed" domain="[('closed', '=', True)]" name="open_firebase_sessions" />
+            </search>
         </field>
     </record>
 </odoo>
