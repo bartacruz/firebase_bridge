@@ -254,7 +254,7 @@ class FirebaseBridge(models.Model):
         logger.info('%s: created firebase message %s for %s (type:%s, model:%s)',self._name,msg.name,msg.partner_id,msg.type,msg.model)
             
     def _oauth_authenticate(self,data):
-        userid = self.env['res.users'].search(['&',['login','=',data.get('username')],['is_active','=',True]])
+        userid = self.env['res.users'].search(['&',['login','=',data.get('username')],['active','=',True]])
         if not userid:
             return False
         user = self.env['res.users'].browse(userid[0].id)
