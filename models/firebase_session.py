@@ -20,14 +20,17 @@ class FirebaseSession(models.Model):
     key = fields.Char(string=_('Key'))
     last = fields.Datetime(_('Last visible'))
     closed = fields.Boolean(_('Closed'))
-    active = fields.Boolean(_('Active'), compute='_compute_active', store=True)
+    is_active = fields.Boolean(_('Active'), compute='_compute_active', store=True)
     
     @api.depends('last', 'closed')
     def _compute_active(self):
         for record in self:
-            record.active = not record.closed and record.last and (fields.Datetime.now() - record.last).total_seconds() <  self.bridge_id.session_timeout
-            print("computing active", record, record.user_id.name, record.active, record.closed,record.last,(fields.Datetime.now() - record.last).total_seconds(),self.bridge_id.session_timeout)        
-    
+            record.is_active = not record.closed and record.last and (fields.Datetime.now() - record.last).total_seconds() <  record.bridge_id.session_timeout
+            
+    def set_last(self,last):
+        self.last = last
+        self.partner_id.firebase_last = last
+        
     def ping(self):
         for record in self:
             if record.bridge_id.connected:
