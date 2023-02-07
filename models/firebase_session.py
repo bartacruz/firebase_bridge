@@ -40,7 +40,7 @@ class FirebaseSession(models.Model):
                     'type': 'ping',
                     'data': {},
                     }
-                _logger.info("Pinging %s@%s" % (record.user_id.name, record.key,))
+                _logger.debug("Pinging %s@%s" % (record.user_id.name, record.key,))
                 record.bridge_id.create_message(msg)
     
     def notify(self):
@@ -52,5 +52,5 @@ class FirebaseSession(models.Model):
                     'type': 'notification',
                     'data': {},
                     }
-                _logger.info("Notifying %s@%s" % (record.user_id.name, record.key,))
+                _logger.debug("Notifying %s@%s" % (record.user_id.name, record.key,))
                 record.bridge_id.create_message(msg)

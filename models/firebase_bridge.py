@@ -47,7 +47,7 @@ class FirebaseBridge(models.Model):
     session_timeout = fields.Integer(_('Session Timeout'),default=600)
     
     def connect(self):
-        logger.debug("Fireserver %s connecting" % self.id)
+        logger.info("Fireserver %s connecting" % self.id)
         #self.write({'connected': False})
         self.connected = False
         thread_name = 'firebase-%s' % self.id
@@ -77,17 +77,15 @@ class FirebaseBridge(models.Model):
             msg = {
                 'type': message.type,
                 'model': message.model,
-                'data': message.data,
-                'collapse_key': 'ping',
-                
+                'data': message.data,                
             }
             options = {}
             if message.type == 'notification':
                 options = {
                     'notification': {
                         'title':'Notification test',
-                        'body': 'Hola, que tal',
-                        'android_channel_id': 'fbtestch',
+                        'body': 'Hola, que tul',
+                        'android_channel_id': 'Lagruva',
                         # 'click_action': 'clicketiclick',
                         'actions': [{
                             'title': 'button',
@@ -96,12 +94,13 @@ class FirebaseBridge(models.Model):
                         }],
                         'papepp': 123,
                     },
+                    'topic': 'Notif'
                 }
-            print(msg,options)
+            # print(msg,options)
             devices = self._get_partner_devices(message)
             for device in devices:
                 xmpp.send_gcm(device,msg,options=options)
-                logger.info('[Firebase Bridge] Message %s sent to %s in %s',message.name, message.partner_id, (fields.Datetime.now() - rtt).total_seconds() )
+                # logger.info('[Firebase Bridge] Message %s sent to %s in %s',message.name, message.partner_id, (fields.Datetime.now() - rtt).total_seconds() )
             message.sent = fields.Datetime.now()
 
     
@@ -163,8 +162,8 @@ class FirebaseBridge(models.Model):
         
     @cursored
     def on_message(self,message):
-        logging.debug('Firebase Bridge %s received: %s' % (self.name, message.data))
-        print('Firebase Bridge %s received: %s' % (self.name, message.data))
+        # logging.debug('Firebase Bridge %s received: %s' % (self.name, message.data))
+        # print('Firebase Bridge %s received: %s' % (self.name, message.data))
         data = message.data.get('data')
         msg_type = data.pop('type',None)
         if not msg_type:
@@ -182,8 +181,8 @@ class FirebaseBridge(models.Model):
                 message.data['user_id'] = session.user_id.id
                 if msg_type == 'rpc':
                     self.do_rpc(message)
-                elif msg_type == 'pong':
-                    print("pong received from",device,key)
+                # elif msg_type == 'pong':
+                #     print("pong received from",device,key)
             else:
                 logger.warning('Unauthorized access. device:%s, key:%s, data:%s' % (device,key,message.data.get('data')))
 
@@ -191,13 +190,13 @@ class FirebaseBridge(models.Model):
         if message.device:
             return [message.device]
         sessions = self.session_ids.filtered(lambda x: x.partner_id.id == message.partner_id.id and x.is_active == True)
-        logger.info('_get_partner_devices sessions: %s' % sessions)
+        # logger.info('_get_partner_devices sessions: %s' % sessions)
         return [s.device for s in sessions]
     
     def _get_session(self,device,key):
         FirebaseSession = self.env['firebase.session']
         session_id = FirebaseSession.search(['&',('device','=',device),('key','=',key),('is_active','=',True)])
-        print('_get_session:',session_id,key,device)
+        # print('_get_session:',session_id,key,device)
         if session_id:
             return FirebaseSession.browse(int(session_id[0]))
 
@@ -234,7 +233,7 @@ class FirebaseBridge(models.Model):
         elif isinstance(ret,models.Model):
             ret = ret.read()
         
-        print('do_rpc ret:', type(ret),ret)
+        # print('do_rpc ret:', type(ret),ret)
         
         if ret:
             for obj in ret:
@@ -251,7 +250,7 @@ class FirebaseBridge(models.Model):
 
     def create_message(self, vals):
         msg = self.env['firebase.message'].create(vals)
-        logger.info('%s: created firebase message %s for %s (type:%s, model:%s)',self._name,msg.name,msg.partner_id,msg.type,msg.model)
+        logger.debug('%s: created firebase message %s for %s (type:%s, model:%s)',self._name,msg.name,msg.partner_id,msg.type,msg.model)
             
     def _oauth_authenticate(self,data):
         userid = self.env['res.users'].search(['&',['login','=',data.get('username')],['active','=',True]])
@@ -261,7 +260,7 @@ class FirebaseBridge(models.Model):
         print('_oauth_authenticate',userid,user,data)
         try:
             validation = self.env['res.users']._auth_oauth_validate(user.oauth_provider_id.id,data.get('password'))
-            print('_oauth_authenticate validation:',validation)
+            # print('_oauth_authenticate validation:',validation)
             if validation['user_id'] == user.oauth_uid:
                 return userid[0].id
         except:
@@ -353,7 +352,7 @@ class FirebaseBridge(models.Model):
         
     def send_to_partner(self,partner_id,model,obj,notification=None):
         ''' Sends a message to all active sessions related to partner'''
-        logger.info('send_to_partner %s, %s, %s ' % (partner_id,model,obj))
+        logger.debug('send_to_partner %s, %s, %s ' % (partner_id,model,obj))
         if not isinstance(obj,str):
             obj = json.dumps(obj, default=date_utils.json_default)
             
@@ -382,7 +381,7 @@ class FirebaseBridge(models.Model):
     def ping_sessions(self):
         for record in self:
             for s in record.session_ids.filtered(lambda x: x.is_active):
-                print("_ping_sessions",(fields.Datetime.now() - s.last).total_seconds(),record.session_timeout/2)
+                # print("_ping_sessions",(fields.Datetime.now() - s.last).total_seconds(),record.session_timeout/2)
                 if (fields.Datetime.now() - s.last).total_seconds() > record.session_timeout/2:
                     s.ping()
         return True
