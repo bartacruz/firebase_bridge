@@ -223,6 +223,7 @@ class FirebaseBridge(models.Model):
         try:
             ret = fn(*fn_args,**fn_kwargs)
         except:
+            logger.warn('do_rpc (uid:%s): %s,%s,%s,%s' % (user_id,model,method, fn_args,fn_kwargs))
             logger.exception("Exception while rpc")
             ret=False
         
