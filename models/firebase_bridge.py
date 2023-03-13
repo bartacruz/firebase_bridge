@@ -220,8 +220,11 @@ class FirebaseBridge(models.Model):
         
         obj = self.env[model].with_user(user_id)
         fn = getattr(obj,method)
-        
-        ret = fn(*fn_args,**fn_kwargs)
+        try:
+            ret = fn(*fn_args,**fn_kwargs)
+        except:
+            logger.exception("Exception while rpc")
+            ret=False
         
         # Normalize return type
         if no_return or not ret or isinstance(ret,bool):
