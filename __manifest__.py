@@ -25,6 +25,7 @@
     # always loaded
     'data': [
         'data/ir_sequence.xml',
+        'data/cron.xml',
         'security/ir.model.access.csv',
         'security/firebase_security.xml',
         'views/firebase_bridge.xml',

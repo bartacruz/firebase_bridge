@@ -1,7 +1,9 @@
+import logging
 import json
 from odoo import _, api, models, fields
 from odoo.tools import date_utils
 
+logger = logging.getLogger(__name__)
 class FirebaseMessage(models.Model):
     _name = 'firebase.message'
     _description = 'Firebase Message'
@@ -29,3 +31,11 @@ class FirebaseMessage(models.Model):
                 "firebase.message") or _("New")
         ret = super(FirebaseMessage, self).create(vals_list)
         return ret
+    
+    @api.model
+    def _cron_delete_old_pings(self, max=10000):
+        pings = self.search(['&',('type','=','ping'),('sent','!=',None)],limit=max)
+        pings_found = len(pings)
+        pings.unlink()
+        pings_left = self.search_count(['&',('type','=','ping'),('sent','!=',None)])
+        logger.info('Pings deleted:%s. left:%s',pings_found,pings_left)
